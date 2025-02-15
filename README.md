@@ -1,8 +1,10 @@
-title: gradio-chatbot
+---
+title: Chatbot with Gradio
 emoji: 🤖
-colorFrom: indigo
-colorTo: blue
+colorFrom: blue
+colorTo: purple
 sdk: gradio
-sdk_version: 5.16.0
+sdk_version: "3.0"
 app_file: app.py
 pinned: false
+---
