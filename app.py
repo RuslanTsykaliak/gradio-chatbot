@@ -1,11 +1,10 @@
-`from flask import Flask, request, jsonify
+from flask import Flask, request, jsonify
 from transformers import pipeline
 
 app = Flask(__name__)
 
 # Load the Hugging Face model
-
-chatbot_model = pipeline("text2text-generation", model="google/flan-t5-large", trust_remote_code=True)
+chatbot_model = pipeline("text2text-generation", model="google/flan-t5-large")
 conversation_history = []
 
 @app.route('/chatbot', methods=['POST'])
@@ -19,13 +18,19 @@ def chatbot():
 def generate_response(user_input):
     # Generate a response using the Hugging Face model
     conversation_history.append(
-        {"role": "user", "content": user_input},
+        {"role": "user", "content": user_input}
     )
-    result = chatbot_model([f'{message['role']}: {message['message']}' for message in conversation_history], num_return_sequences=1, max_new_tokens=250)
+    result = chatbot_model(
+        [f"{message['role']}: {message['content']}" for message in conversation_history], 
+        num_return_sequences=1, 
+        max_new_tokens=250
+    )
+
+    assistant_response = result[0]['generated_text']
     conversation_history.append(
-        {"role": "assistant", "content": result[0]['generated_text'][-1]['content']},
+        {"role": "assistant", "content": assistant_response}
     )
-    return result[0]['generated_text'][-1]['content']
+    return assistant_response
 
 if __name__ == '__main__':
     app.run(debug=True, port=80, host='0.0.0.0')
