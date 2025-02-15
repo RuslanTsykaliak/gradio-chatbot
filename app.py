@@ -1,36 +1,42 @@
-from flask import Flask, request, jsonify
-from transformers import pipeline
+import gradio as gr
+from transformers import pipeline, AutoTokenizer, AutoModelForCausalLM
 
-app = Flask(__name__)
+# Load the model and tokenizer using Hugging Face
+model_name = "microsoft/Phi-3-mini-4k-instruct"
 
-# Load the Hugging Face model
-chatbot_model = pipeline("text2text-generation", model="google/flan-t5-large")
-conversation_history = []
+# Explicitly load the tokenizer and model
+tokenizer = AutoTokenizer.from_pretrained(model_name, trust_remote_code=True)
+model = AutoModelForCausalLM.from_pretrained(model_name, trust_remote_code=True)
 
-@app.route('/chatbot', methods=['POST'])
-def chatbot():
-    user_input = request.json.get('message')
-    if not user_input:
-        return jsonify({'response': 'Please provide a message.'}), 400
-    response = generate_response(user_input)
-    return jsonify({'response': response})
+# Create the pipeline
+chatbot = pipeline("text-generation", model=model, tokenizer=tokenizer, framework="pt")
 
-def generate_response(user_input):
-    # Generate a response using the Hugging Face model
-    conversation_history.append(
-        {"role": "user", "content": user_input}
-    )
-    result = chatbot_model(
-        [f"{message['role']}: {message['content']}" for message in conversation_history], 
-        num_return_sequences=1, 
-        max_new_tokens=250
-    )
+def respond(
+	message,
+	history: list[tuple[str, str]],
+	system_message,
+	max_tokens,
+	temperature,
+	top_p,
+):
+	# Combine system message and conversation history
+	prompt = system_message + "\n"
+	prompt += f"User: {message}\n\nBot:"
 
-    assistant_response = result[0]['generated_text']
-    conversation_history.append(
-        {"role": "assistant", "content": assistant_response}
-    )
-    return assistant_response
+	# Generate the response using the model
+	response = chatbot(prompt, max_length=max_tokens, temperature=temperature, top_p=top_p)[0]['generated_text']
+	return response
 
-if __name__ == '__main__':
-    app.run(debug=True, port=80, host='0.0.0.0')
+# Define the Gradio interface with additional inputs
+demo = gr.ChatInterface(
+	respond,
+	additional_inputs=[
+    	gr.Textbox(value="You are a friendly Chatbot.", label="System message"),
+    	gr.Slider(minimum=1, maximum=2048, value=512, step=1, label="Max new tokens"),
+    	gr.Slider(minimum=0.1, maximum=4.0, value=0.7, step=0.1, label="Temperature"),
+    	gr.Slider(minimum=0.1, maximum=1.0, value=0.95, step=0.05, label="Top-p (nucleus sampling)"),
+	],
+)
+
+if __name__ == "__main__":
+	demo.launch()
